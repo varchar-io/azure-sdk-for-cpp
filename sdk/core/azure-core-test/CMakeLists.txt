@@ -20,9 +20,7 @@ set(
 
 set(
   AZURE_CORE_TEST_SOURCE
-  src/private/environment.hpp
   src/private/package_version.hpp
-  src/environment.cpp
   src/interceptor_manager.cpp
   src/playback_http_transport.cpp
   src/record_policy.cpp
@@ -48,3 +46,4 @@ target_include_directories (azure-core-test-fw
 # make sure that users can consume the project as a library.
 add_library (Azure::Core::Test ALIAS azure-core-test-fw)
 target_link_libraries(azure-core-test-fw PRIVATE azure-core gtest)
+create_map_file(azure-core-test-fw azure-core-test-fw.map)

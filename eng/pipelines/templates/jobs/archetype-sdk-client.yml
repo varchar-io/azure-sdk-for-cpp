@@ -14,6 +14,9 @@ parameters:
   - name: CtestRegex
     type: string
     default: .*
+  - name: CtestExcludeRegex
+    type: string
+    default: ''
   - name: BuildReleaseArtifacts
     type: boolean
     default: true
@@ -26,6 +29,9 @@ parameters:
   - name: BranchCoverageTarget
     type: number
     default: 70
+  - name: TestEnv
+    type: object
+    default: []
 
 jobs:
   - template: /eng/common/pipelines/templates/jobs/archetype-sdk-tests-generate.yml
@@ -41,10 +47,12 @@ jobs:
         ServiceDirectory: ${{ parameters.ServiceDirectory }}
         TestPipeline: ${{ parameters.TestPipeline }}
         CtestRegex: ${{ parameters.CtestRegex }}
+        CtestExcludeRegex: ${{ parameters.CtestExcludeRegex }}
         CoverageReportPath: ${{ parameters.CoverageReportPath }}
         CoverageEnabled: ${{ parameters.CoverageEnabled }}
         LineCoverageTarget: ${{ parameters.LineCoverageTarget }}
         BranchCoverageTarget: ${{ parameters.BranchCoverageTarget }}
+        TestEnv: ${{ parameters.TestEnv }}
 
   # Disable build for cpp - client
   - ${{ if ne(parameters.ServiceDirectory, 'not-specified' )}}:
@@ -55,6 +63,7 @@ jobs:
       variables:
         VcpkgDependencies: curl[winssl] libxml2
         VCPKG_DEFAULT_TRIPLET: 'x64-windows-static'
+        Package.EnableSBOMSigning: true
       steps:
         - template: /eng/common/pipelines/templates/steps/check-spelling.yml
           parameters:
@@ -94,6 +103,7 @@ jobs:
 
         - template: /eng/pipelines/templates/steps/cmake-build.yml
           parameters:
+            ServiceDirectory: ${{ parameters.ServiceDirectory }}
             Build: false
             GenerateArgs: >-
               -DINSTALL_GTEST=OFF
@@ -201,3 +211,14 @@ jobs:
             path: $(Build.ArtifactStagingDirectory)/docs
 
         - template: /eng/common/pipelines/templates/steps/eng-common-workflow-enforcer.yml
+
+        - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
+          displayName: 'Generate BOM'
+          condition: succeededOrFailed()
+          inputs:
+            BuildDropPath: $(Build.SourcesDirectory)/build
+
+        - template: /eng/common/pipelines/templates/steps/publish-artifact.yml
+          parameters:
+            ArtifactPath: '$(Build.SourcesDirectory)/build/_manifest'
+            ArtifactName: 'release_artifact_manifest'

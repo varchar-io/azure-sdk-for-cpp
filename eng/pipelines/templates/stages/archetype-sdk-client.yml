@@ -5,6 +5,9 @@ parameters:
 - name: CtestRegex
   type: string
   default: .*
+- name: CtestExcludeRegex
+  type: string
+  default: ''
 - name: CoverageEnabled
   type: boolean
   default: true
@@ -12,6 +15,9 @@ parameters:
   type: string
   default: ''
 - name: Artifacts
+  type: object
+  default: []
+- name: ArtifactsSource
   type: object
   default: []
 - name: Location
@@ -25,28 +31,55 @@ parameters:
   default: 'sdk/*/*/*cov_xml.xml'
 - name: LiveTestTimeoutInMinutes
   type: number
-  default: 60
+  default: 90
 - name: LineCoverageTarget
   type: number
   default: 95
 - name: BranchCoverageTarget
   type: number
   default: 70
+- name: TestEnv
+  type: object
+  default: []
+- name: CMakeTestOptions
+  type: object
+  default: []
+- name: CMakeSourceTestOptions
+  type: object
+  default: []
+- name: CMakeTestDependencies
+  type: string
+  default: ''
 
 stages:
+  - ${{ if eq(variables['System.TeamProject'], 'public') }}:
+    - stage: CMakeGeneration
+      jobs:
+        - template: /eng/pipelines/templates/jobs/archetype-sdk-cmake-generate.yml
+          parameters:
+            ServiceDirectory: ${{ parameters.ServiceDirectory }}
+            Artifacts: ${{ parameters.Artifacts }}
+            ArtifactsSource: ${{ parameters.ArtifactsSource }}
+            CMakeTestOptions: ${{ parameters.CMakeTestOptions }}
+            CMakeSourceTestOptions: ${{ parameters.CMakeSourceTestOptions }}
+            CMakeTestDependencies: ${{ parameters.CMakeTestDependencies }}
+
   - stage: Build
+    dependsOn: []
     jobs:
       - template: /eng/pipelines/templates/jobs/archetype-sdk-client.yml
         parameters:
           ServiceDirectory: ${{ parameters.ServiceDirectory }}
           Artifacts: ${{ parameters.Artifacts }}
           CtestRegex: ${{ parameters.CtestRegex }}
+          CtestExcludeRegex: ${{ parameters.CtestExcludeRegex }}
           CoverageEnabled: ${{ parameters.CoverageEnabled }}
           CoverageReportPath: ${{ parameters.CoverageReportPath }}
           LineCoverageTarget: ${{ parameters.LineCoverageTarget }}
           BranchCoverageTarget: ${{ parameters.BranchCoverageTarget }}
           ${{ if eq(parameters.ServiceDirectory, 'template') }}:
             TestPipeline: true
+          TestEnv: ${{ parameters.TestEnv }}
 
   - ${{ if and(eq(variables['System.TeamProject'], 'internal'), ne(parameters.LiveTestCtestRegex, '')) }}:
     - stage: LiveTest

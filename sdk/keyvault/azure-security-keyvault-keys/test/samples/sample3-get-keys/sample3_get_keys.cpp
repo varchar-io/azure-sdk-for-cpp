@@ -14,9 +14,7 @@
  *
  */
 
-#if defined(_MSC_VER)
-#define _CRT_SECURE_NO_WARNINGS
-#endif
+#include "get_env.hpp"
 
 #include <azure/core.hpp>
 #include <azure/identity.hpp>
@@ -39,14 +37,7 @@ int main()
       = std::make_shared<Azure::Identity::ClientSecretCredential>(tenantId, clientId, clientSecret);
 
   KeyClient keyClient(std::getenv("AZURE_KEYVAULT_URL"), credential);
-  try
-  {
-    KeyVaultKey key = keyClient.GetKey("some_key").Value;
-  }
-  catch (const Azure::Core::RequestFailedException& ex)
-  {
-    std::cout << std::underlying_type<Azure::Core::Http::HttpStatusCode>::type(ex.StatusCode);
-  }
+
   try
   {
     std::string rsaKeyName("CloudRsaKey-" + Azure::Core::Uuid::CreateUuid().ToString());

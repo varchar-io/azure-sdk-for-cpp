@@ -1,13 +1,34 @@
 # Release History
 
-## 1.3.0-beta.1 (Unreleased)
+## 1.4.0-beta.1 (Unreleased)
+
+### Features Added
+
+- Enabled environment-controlled console logging on UWP.
+
+### Breaking Changes
+
+- Removed the `AzureNoReturnPath()` function from the global namespace, and deprecated the associated macros, such as `AZURE_ASSERT` since they are meant for internal use only. If your code was using the `AZURE_ASSERT` macro, consider using the standard library's `assert` as an alternative.
+
+### Bugs Fixed
+
+- Fixed `Azure::DateTime::Parse()` validation if the result is going to exceed `9999-12-31T23:59:59.9999999` due to time zone, leap second, or fractional digits rounding up adjustments.
+- [[#3224]](https://github.com/Azure/azure-sdk-for-cpp/issues/3224) Fixed intermittent crash on macOS when logging is turned on.
+
+### Other Changes
+
+## 1.3.1 (2021-11-05)
+
+### Bugs Fixed
+
+- Fixed linking error when Azure SDK is being built as DLL.
+
+## 1.3.0 (2021-11-04)
 
 ### Features Added
 
 - Add `NoSignal` option to the `CurlTransportAdapter`.
 - Add `ConnectionTimeout` option to the `CurlTransportAdapter`.
-
-### Breaking Changes
 
 ### Bugs Fixed
 
@@ -301,7 +322,7 @@ Thank you to our developer community members who helped to make Azure Core bette
 ### Acknowledgments
 
 Thank you to our developer community members who helped to make Azure Core better with their contributions to this release:
-<!-- cspell:ignore Gyimesi -->
+
 - Gabor Gyimesi _([GitHub](https://github.com/lordgamez))_
 - Marcelo Juchem _([GitHub](https://github.com/juchem))_
 - `ku-sourav` _([GitHub](https://github.com/ku-sourav))_

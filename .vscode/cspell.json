@@ -11,15 +11,14 @@
     "*.exe",
     "*.a",
     "*.lib",
+    ".gitignore",
     ".vscode/cspell.json",
     "eng/common/**/*",
     "json.hpp",
+    "Dockerfile",
     "*nlohmann-json*",
     "eng/docs/api/assets/**/*",
-    "sdk/keyvault/azure-security-keyvault-keys/test/ut/recordings/*.json",
-    "sdk/keyvault/azure-security-keyvault-certificates/test/ut/recordings/*.json",
-    "sdk/keyvault/azure-security-keyvault-certificates/inc/azure/keyvault/certificates/certificate_client_models.hpp",
-    "sdk/keyvault/azure-security-keyvault-keys/test/ut/key_client_import_test_live.cpp"
+    "**/test/ut/recordings/*.json"
   ],
   // * Unless configured otherwise, these words are not case sensitive
   // * Alphabetize the list when making changes so the list is easier for future
@@ -40,6 +39,7 @@
     "DCMAKE",
     "deserializers",
     "Deserializes",
+    "DFETCH",
     "docfx",
     "DPAPI",
     "DRUN",
@@ -140,6 +140,7 @@
         "copiable",
         "davidchisnall",
         "Gabor",
+        "Gyimesi",
         "Joubert",
         "juchem",
         "lordgamez",
@@ -172,7 +173,8 @@
         "fprofile",
         "ftest",
         "mathjax",
-        "mdfile"
+        "mdfile",
+        "Xlinker"
       ]
     }
   ],

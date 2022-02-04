@@ -61,10 +61,9 @@ namespace Azure { namespace Core { namespace Http {
      * @remark The transport policy will throw this error whenever the transport adapter fail to
      * perform a request.
      *
-     * @param whatArg The explanatory string.
+     * @param what The explanatory string.
      */
-    explicit TransportException(std::string const& whatArg)
-        : Azure::Core::RequestFailedException(whatArg)
+    explicit TransportException(std::string const& what) : Azure::Core::RequestFailedException(what)
     {
     }
   };
@@ -227,7 +226,7 @@ namespace Azure { namespace Core { namespace Http {
         : m_method(std::move(httpMethod)), m_url(std::move(url)), m_bodyStream(bodyStream),
           m_retryModeEnabled(false), m_shouldBufferResponse(shouldBufferResponse)
     {
-      AZURE_ASSERT_MSG(bodyStream, "The bodyStream pointer cannot be null.");
+      _azure_ASSERT_MSG(bodyStream, "The bodyStream pointer cannot be null.");
     }
 
   public:

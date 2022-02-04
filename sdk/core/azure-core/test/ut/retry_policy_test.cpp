@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // SPDX-License-Identifier: MIT
 
+#include "azure/core/diagnostics/logger.hpp"
 #include "azure/core/http/policies/policy.hpp"
 #include "azure/core/internal/http/pipeline.hpp"
 
@@ -44,18 +45,57 @@ private:
       m_shouldRetryOnResponse;
 
 public:
+  bool BaseShouldRetryOnTransportFailure(
+      RetryOptions const& retryOptions,
+      int32_t attempt,
+      std::chrono::milliseconds& retryAfter,
+      double jitterFactor) const
+  {
+    return RetryPolicy::ShouldRetryOnTransportFailure(
+        retryOptions, attempt, retryAfter, jitterFactor);
+  }
+
+  bool BaseShouldRetryOnResponse(
+      RawResponse const& response,
+      RetryOptions const& retryOptions,
+      int32_t attempt,
+      std::chrono::milliseconds& retryAfter,
+      double jitterFactor) const
+  {
+    return RetryPolicy::ShouldRetryOnResponse(
+        response, retryOptions, attempt, retryAfter, jitterFactor);
+  }
+
   RetryPolicyTest(
       RetryOptions const& retryOptions,
-      std::function<bool(RetryOptions const&, int32_t, std::chrono::milliseconds&, double)>
-          shouldRetryOnTransportFailure,
-      std::function<bool(
-          RawResponse const&,
-          RetryOptions const&,
-          int32_t,
-          std::chrono::milliseconds&,
-          double)> shouldRetryOnResponse)
-      : RetryPolicy(retryOptions), m_shouldRetryOnTransportFailure(shouldRetryOnTransportFailure),
-        m_shouldRetryOnResponse(shouldRetryOnResponse)
+      decltype(m_shouldRetryOnTransportFailure) shouldRetryOnTransportFailure,
+      decltype(m_shouldRetryOnResponse) shouldRetryOnResponse)
+      : RetryPolicy(retryOptions),
+        m_shouldRetryOnTransportFailure(
+            shouldRetryOnTransportFailure != nullptr //
+                ? shouldRetryOnTransportFailure
+                : static_cast<decltype(m_shouldRetryOnTransportFailure)>( //
+                    [this](auto options, auto attempt, auto retryAfter, auto jitter) {
+                      retryAfter = std::chrono::milliseconds(0);
+                      auto ignore = decltype(retryAfter)();
+                      return this->BaseShouldRetryOnTransportFailure(
+                          options, attempt, ignore, jitter);
+                    })),
+        m_shouldRetryOnResponse(
+            shouldRetryOnResponse != nullptr //
+                ? shouldRetryOnResponse
+                : static_cast<decltype(m_shouldRetryOnResponse)>( //
+                    [this](
+                        RawResponse const& response,
+                        auto options,
+                        auto attempt,
+                        auto retryAfter,
+                        auto jitter) {
+                      retryAfter = std::chrono::milliseconds(0);
+                      auto ignore = decltype(retryAfter)();
+                      return this->BaseShouldRetryOnResponse(
+                          response, options, attempt, ignore, jitter);
+                    }))
   {
   }
 
@@ -716,4 +756,80 @@ TEST(RetryPolicy, RetryAfter)
     EXPECT_EQ(shouldRetry, true);
     EXPECT_EQ(retryAfter, 90s);
   }
+}
+
+TEST(RetryPolicy, LogMessages)
+{
+  using Azure::Core::Diagnostics::Logger;
+
+  struct Log
+  {
+    struct Entry
+    {
+      Logger::Level Level;
+      std::string Message;
+    };
+
+    std::vector<Entry> Entries;
+
+    Log()
+    {
+      Logger::SetLevel(Logger::Level::Informational);
+      Logger::SetListener([&](auto lvl, auto msg) { Entries.emplace_back(Entry{lvl, msg}); });
+    }
+
+    ~Log()
+    {
+      Logger::SetListener(nullptr);
+      Logger::SetLevel(Logger::Level::Warning);
+    }
+
+  } log;
+
+  {
+    using namespace std::chrono_literals;
+    RetryOptions const retryOptions{5, 10s, 5min, {HttpStatusCode::InternalServerError}};
+
+    auto requestNumber = 0;
+
+    std::vector<std::unique_ptr<Azure::Core::Http::Policies::HttpPolicy>> policies;
+    policies.emplace_back(std::make_unique<RetryPolicyTest>(retryOptions, nullptr, nullptr));
+    policies.emplace_back(std::make_unique<TestTransportPolicy>([&]() {
+      ++requestNumber;
+
+      if (requestNumber == 1)
+      {
+        throw TransportException("Cable Unplugged");
+      }
+
+      return std::make_unique<RawResponse>(
+          1,
+          1,
+          requestNumber == 2 ? HttpStatusCode::InternalServerError
+                             : HttpStatusCode::ServiceUnavailable,
+          "Test");
+    }));
+
+    Azure::Core::Http::_internal::HttpPipeline pipeline(policies);
+
+    Request request(HttpMethod::Get, Azure::Core::Url("https://www.microsoft.com"));
+    pipeline.Send(request, Azure::Core::Context());
+  }
+
+  EXPECT_EQ(log.Entries.size(), 5);
+
+  EXPECT_EQ(log.Entries[0].Level, Logger::Level::Warning);
+  EXPECT_EQ(log.Entries[0].Message, "HTTP Transport error: Cable Unplugged");
+
+  EXPECT_EQ(log.Entries[1].Level, Logger::Level::Informational);
+  EXPECT_EQ(log.Entries[1].Message, "HTTP Retry attempt #1 will be made in 0ms.");
+
+  EXPECT_EQ(log.Entries[2].Level, Logger::Level::Informational);
+  EXPECT_EQ(log.Entries[2].Message, "HTTP status code 500 will be retried.");
+
+  EXPECT_EQ(log.Entries[3].Level, Logger::Level::Informational);
+  EXPECT_EQ(log.Entries[3].Message, "HTTP Retry attempt #2 will be made in 0ms.");
+
+  EXPECT_EQ(log.Entries[4].Level, Logger::Level::Warning);
+  EXPECT_EQ(log.Entries[4].Message, "HTTP status code 503 won't be retried.");
 }

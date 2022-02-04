@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "azure/core/azure_assert.hpp"
 #include "azure/core/datetime.hpp"
 #include "azure/core/dll_import_export.hpp"
+#include "azure/core/internal/azure_assert.hpp"
 #include "azure/core/rtti.hpp"
 
 #include <atomic>
@@ -30,11 +30,9 @@ namespace Azure { namespace Core {
     /**
      * @brief Constructs an `OperationCancelledException` with message string as the description.
      *
-     * @param whatArg The explanatory string.
+     * @param what The explanatory string.
      */
-    explicit OperationCancelledException(std::string const& whatArg) : std::runtime_error(whatArg)
-    {
-    }
+    explicit OperationCancelledException(std::string const& what) : std::runtime_error(what) {}
   };
 
   /**
@@ -210,7 +208,7 @@ namespace Azure { namespace Core {
         if (ptr->Key == key)
         {
 #if defined(AZ_CORE_RTTI)
-          AZURE_ASSERT_MSG(
+          _azure_ASSERT_MSG(
               typeid(T) == ptr->ValueType, "Type mismatch for Context::TryGetValue().");
 #endif
 

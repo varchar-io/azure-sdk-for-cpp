@@ -17,6 +17,7 @@ include(AzureTransportAdapters)
 include(AzureDoxygen)
 include(AzureGlobalCompileOptions)
 include(AzureConfigRTTI)
+include(AzureBuildTargetForCI)
 
 az_vcpkg_integrate()
 
@@ -41,6 +42,7 @@ set(
 )
 
 add_library(azure-template ${AZURE_TEMPLATE_HEADER} ${AZURE_TEMPLATE_SOURCE})
+create_per_service_target_build(azure-template template)
 
 target_include_directories(
   azure-template
@@ -58,9 +60,9 @@ target_include_directories(
 add_library(Azure::azure-template ALIAS azure-template)
 
 # coverage. Has no effect if BUILD_CODE_COVERAGE is OFF
-create_code_coverage(template azure-template azure-template-test)
+create_code_coverage(template azure-template azure-template-test "tests?/*;samples?/*")
 
-get_az_version("${CMAKE_CURRENT_SOURCE_DIR}/src/private//package_version.hpp")
+get_az_version("${CMAKE_CURRENT_SOURCE_DIR}/src/private/package_version.hpp")
 generate_documentation(azure-template ${AZ_LIBRARY_VERSION})
 
 az_vcpkg_export(

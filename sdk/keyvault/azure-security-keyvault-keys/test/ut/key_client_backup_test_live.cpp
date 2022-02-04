@@ -1,10 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-#if defined(_MSC_VER)
-#define _CRT_SECURE_NO_WARNINGS
-#endif
-
 #include "gtest/gtest.h"
 
 #include "key_client_base_test.hpp"
@@ -22,10 +18,10 @@ using namespace Azure::Security::KeyVault::Keys::Test;
 using namespace Azure::Security::KeyVault::Keys;
 using namespace Azure::Core::Json::_internal;
 
-TEST_F(KeyVaultClientTest, BackupKey)
+TEST_F(KeyVaultKeyClient, BackupKey)
 {
-  std::string keyName = GetUniqueName();
-  auto const& client = GetClientForTest("BackupKey");
+  std::string keyName = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+  auto const& client = GetClientForTest(keyName);
 
   std::cout
       << std::endl
@@ -45,7 +41,7 @@ TEST_F(KeyVaultClientTest, BackupKey)
     // Delete
     std::cout << std::endl << "- Delete key";
     auto response = client.StartDeleteKey(keyName);
-    response.PollUntilDone(m_testPollingIntervalMinutes);
+    response.PollUntilDone(m_testPollingIntervalMs);
   }
   {
     // Purge
@@ -53,7 +49,7 @@ TEST_F(KeyVaultClientTest, BackupKey)
     auto response = client.PurgeDeletedKey(keyName);
     CheckValidResponse(response, Azure::Core::Http::HttpStatusCode::NoContent);
     // Purge can take up to 2 min
-    std::this_thread::sleep_for(std::chrono::minutes(4));
+    TestSleep(4min);
   }
   { // Check key is gone
     EXPECT_THROW(client.GetKey(keyName), Azure::Core::RequestFailedException);

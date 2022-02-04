@@ -1,26 +1,50 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-#ifdef _MSC_VER
-#define _CRT_SECURE_NO_WARNINGS // for std::getenv()
-#endif
-
+#include <azure/core/internal/environment.hpp>
 #include <azure/core/internal/json/json.hpp>
 #include <azure/core/internal/strings.hpp>
 
 #include "azure/core/test/interceptor_manager.hpp"
-#include "private/environment.hpp"
 
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <stdexcept>
 #include <string>
 
 using namespace Azure::Core::Test;
 using namespace Azure::Core::Json::_internal;
 using namespace Azure::Core;
+using Azure::Core::_internal::Environment;
 
-TestMode InterceptorManager::GetTestMode() { return _detail::Environment::GetTestMode(); }
+TestMode InterceptorManager::GetTestMode()
+{
+  auto value = Environment::GetVariable("AZURE_TEST_MODE");
+  if (value.empty())
+  {
+    return Azure::Core::Test::TestMode::LIVE;
+  }
+
+  if (Azure::Core::_internal::StringExtensions::LocaleInvariantCaseInsensitiveEqual(
+          value, "RECORD"))
+  {
+    return Azure::Core::Test::TestMode::RECORD;
+  }
+  else if (Azure::Core::_internal::StringExtensions::LocaleInvariantCaseInsensitiveEqual(
+               value, "PLAYBACK"))
+  {
+    return Azure::Core::Test::TestMode::PLAYBACK;
+  }
+  else if (Azure::Core::_internal::StringExtensions::LocaleInvariantCaseInsensitiveEqual(
+               value, "LIVE"))
+  {
+    return Azure::Core::Test::TestMode::LIVE;
+  }
+
+  // unexpected variable value
+  throw std::runtime_error("Invalid environment variable: " + value);
+}
 
 void InterceptorManager::LoadTestData()
 {
@@ -62,7 +86,13 @@ Url InterceptorManager::RedactUrl(Url const& url)
   auto host = url.GetHost();
   auto hostWithNoAccount = std::find(host.begin(), host.end(), '.');
   redactedUrl.SetHost("REDACTED" + std::string(hostWithNoAccount, host.end()));
-  redactedUrl.SetPath(url.GetPath());
+  // replace any uniqueID from the path for a hardcoded id
+  // For the regex, we should not assume anything about the version of UUID format being used. So,
+  // using the most general regex to get any uuid version.
+  redactedUrl.SetPath(std::regex_replace(
+      url.GetPath(),
+      std::regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"),
+      "33333333-3333-3333-3333-333333333333"));
   // Query parameters
   for (auto const& qp : url.GetQueryParameters())
   {

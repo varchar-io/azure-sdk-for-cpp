@@ -24,7 +24,7 @@ namespace Azure { namespace Security { namespace KeyVault { namespace Keys { nam
 
   namespace _detail {
     // Return a simple key as response so keyvault can parse it to create the T response
-    // Fake key from https://docs.microsoft.com/en-us/rest/api/keyvault/GetKey/GetKey#examples
+    // Fake key from https://docs.microsoft.com/rest/api/keyvault/GetKey/GetKey#examples
     static const char FakeKey[]
         = "{  \"key\": {    \"kid\": "
           "\"https://myvault.vault.azure.net/keys/CreateSoftKeyTest/"
@@ -92,7 +92,16 @@ namespace Azure { namespace Security { namespace KeyVault { namespace Keys { nam
       }
 
       result = new char[std::string(fakeKey).size() + keyType.size()];
+
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
       std::sprintf(result, fakeKey, keyType.c_str());
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
       return result;
     }
   };
@@ -117,7 +126,7 @@ namespace Azure { namespace Security { namespace KeyVault { namespace Keys { nam
     }
   };
 
-  class MockedTransportAdapterTest : public ::testing::Test {
+  class KeyVaultKeyClientMocked : public ::testing::Test {
   protected:
     std::unique_ptr<KeyClientWithNoAuthenticationPolicy> m_client;
     Azure::Security::KeyVault::Keys::KeyClientOptions m_clientOptions;

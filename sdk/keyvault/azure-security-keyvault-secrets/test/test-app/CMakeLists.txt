@@ -13,6 +13,10 @@ add_executable (
     macro_guard.cpp
  )
 
+create_per_service_target_build(keyvault-secrets-test-app keyvault)
+
+create_map_file(keyvault-secrets-test-app keyvault-secrets-test-app.map)
+
 if (MSVC)
   target_compile_options(keyvault-secrets-test-app PUBLIC /wd6326 /wd26495 /wd26812)
 endif()

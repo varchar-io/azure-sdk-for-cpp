@@ -9,7 +9,7 @@
 
 namespace Azure { namespace Storage { namespace Test {
 
-  TEST_F(QueueClientTest, QueueSasTest)
+  TEST_F(QueueClientTest, QueueSasTest_LIVEONLY_)
   {
     auto sasStartsOn = std::chrono::system_clock::now() - std::chrono::minutes(5);
     auto sasExpiredOn = std::chrono::system_clock::now() - std::chrono::minutes(1);
@@ -210,7 +210,9 @@ namespace Azure { namespace Storage { namespace Test {
       identifier.StartsOn = sasStartsOn;
       identifier.ExpiresOn = sasExpiresOn;
       identifier.Permissions = "r";
-      queueClient0.SetAccessPolicy({identifier});
+      Queues::Models::QueueAccessPolicy accessPolicy;
+      accessPolicy.SignedIdentifiers.push_back(identifier);
+      queueClient0.SetAccessPolicy(accessPolicy);
 
       Sas::QueueSasBuilder builder2 = queueSasBuilder;
       builder2.StartsOn.Reset();

@@ -11,6 +11,9 @@ parameters:
   - name: CtestRegex
     type: string
     default: .*
+  - name: CtestExcludeRegex
+    type: string
+    default: ''
   - name: CoverageReportPath
     type: string
     default: 'sdk/*/*/*cov_xml.xml'
@@ -25,8 +28,9 @@ parameters:
   - name: BranchCoverageTarget
     type: number
     default: 70
-
-
+  - name: TestEnv
+    type: object
+    default: []    
   # Supplied by archetype-sdk-tests-generate.yml dynamic matrix generator
   - name: CloudConfig
     type: object
@@ -63,8 +67,15 @@ jobs:
       value: ""
     - name: CmakeArgs
       value: ""
+# Apply to all services running public pipeline
     - name: AZURE_TEST_MODE
       value: "PLAYBACK"
+    - name: AZURE_LOG_LEVEL
+      value: "verbose"
+    - ${{ each testEnvVar in parameters.TestEnv }}:
+      - name: ${{ testEnvVar.Name }}
+        value: ${{ testEnvVar.Value }}
+
     steps:
       - template: /eng/common/pipelines/templates/steps/verify-agent-os.yml
         parameters:
@@ -73,6 +84,15 @@ jobs:
       - pwsh: sudo apt update && sudo apt install -y $(AptDependencies)
         condition: and(succeeded(), ne(variables['AptDependencies'], ''))
         displayName: Install dependencies from apt
+
+      - pwsh: sudo xcode-select -s /Applications/Xcode_$(XCODE_VERSION).app/Contents/Developer
+        condition: >-
+          and(
+            succeeded(),
+            contains(variables['OSVmImage'], 'macOS'),
+            ne(variables['XCODE_VERSION'], '')
+          )
+        displayName: Set Xcode version
 
       - template: /eng/pipelines/templates/steps/vcpkg.yml
         parameters:
@@ -112,12 +132,21 @@ jobs:
 
       - template: /eng/pipelines/templates/steps/cmake-build.yml
         parameters:
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
           GenerateArgs: "$(CmakeArgs)"
           BuildArgs: "$(BuildArgs)"
           Env: "$(CmakeEnvArg)"
 
-      - script: ctest -C Debug --tests-regex ${{ parameters.CtestRegex }} --no-compress-output -T Test
+      - pwsh: |
+          ctest `
+            -C Debug `
+            -V `
+            --tests-regex '${{ parameters.CtestRegex }}' `
+            --exclude-regex '${{ parameters.CtestExcludeRegex }}' `
+            --no-compress-output `
+            -T Test
         workingDirectory: build
+        displayName: Test
 
       - task: PublishTestResults@2
         inputs:
@@ -174,3 +203,52 @@ jobs:
             # Minimum baseline for branch coverage
             coverageThreshold: ${{ parameters.BranchCoverageTarget }}
           condition: and(succeededOrFailed(), eq(variables['CODE_COVERAGE'], 'enabled'), eq(variables['Skip.BranchCoverageEnforcement'], ''))
+
+      # Use the job name to create the artifact name for MAP file publishing.
+      # Attempts are also noted starting with 1
+      # "Validate Windows2019_UWP_debug_x86" -> "Windows2019_UWP_debug_x86_attempt_1"
+      - pwsh: |
+          $artifactName = "$(Agent.JobName)_attempt_$(System.JobAttempt)"
+          $parts = $artifactName -split ' '
+          if ($parts[1]) {
+            $artifactName = $parts[1]
+          }
+          Write-Host "##vso[task.setvariable variable=MapFileArtifactName;]$artifactName"
+        displayName: Set map file artifact name
+        condition: eq(variables['PublishMapFiles'], 'true')
+
+      - task: CopyFiles@2
+        inputs:
+          contents: "**/*.map"
+          targetFolder: $(Build.ArtifactStagingDirectory)
+          flattenFolders: true
+        condition: eq(variables['PublishMapFiles'], 'true')
+        displayName: Stage map files
+
+      - task: PublishPipelineArtifact@1
+        inputs:
+          artifactName: map-files-$(MapFileArtifactName)
+          path: $(Build.ArtifactStagingDirectory)
+        condition: eq(variables['PublishMapFiles'], 'true')
+        displayName : Publish map file artifacts
+        
+      - pwsh: |
+          $artifactName = "$(Agent.JobName)"
+          $parts = $artifactName -split ' '
+          if ($parts[1]) {
+            $artifactName = $parts[1]
+          }
+          Write-Host "##vso[task.setvariable variable=BomArtifactName;]$artifactName"
+        displayName: Set bom file artifact name
+        condition: succeededOrFailed()
+
+      - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
+        displayName: 'Generate BOM'
+        condition: succeededOrFailed()
+        inputs:
+          BuildDropPath: $(Build.ArtifactStagingDirectory)
+
+      - template: /eng/common/pipelines/templates/steps/publish-artifact.yml
+        parameters:
+          ArtifactPath: '$(Build.ArtifactStagingDirectory)/_manifest'
+          ArtifactName: 'bom_manifest_$(BomArtifactName)'
