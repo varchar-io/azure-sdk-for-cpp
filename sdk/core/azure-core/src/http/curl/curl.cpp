@@ -1223,7 +1223,7 @@ size_t CurlSession::ResponseBufferParser::BuildHeader(
 namespace {
 inline std::string GetConnectionKey(std::string const& host, CurlTransportOptions const& options)
 {
-  std::string key(host);
+  std::string key = host;
   key.append(!options.CAInfo.empty() ? options.CAInfo : "0");
   key.append(!options.Proxy.empty() ? options.Proxy : "0");
   key.append(!options.SslOptions.EnableCertificateRevocationListCheck ? "1" : "0");
